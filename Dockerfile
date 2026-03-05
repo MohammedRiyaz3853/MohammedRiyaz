@@ -1,8 +1,13 @@
-# Dockerfile
-FROM python:3.9-slim-buster
+FROM python:3.10-slim
+
 WORKDIR /app
+
+# Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY .
-EXPOSE 5000
+
+# Copy application code
+COPY app.py .
+
+# Run the application
 CMD ["python", "app.py"]
