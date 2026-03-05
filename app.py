@@ -1,135 +1,121 @@
 """
-Test cases for Linear Regression Model
+Linear Regression Model Application
+This module trains and serves a linear regression model for predictions.
 """
 
-import unittest
+import json
+from sklearn.linear_model import LinearRegression
+from sklearn.datasets import make_regression
 import numpy as np
-import tempfile
+import pickle
 import os
-from app import LinearRegressionModel, create_sample_data
 
 
-class TestLinearRegressionModel(unittest.TestCase):
-    """Test cases for LinearRegressionModel class"""
+class LinearRegressionModel:
+    """Linear Regression Model Wrapper"""
     
-    def setUp(self):
-        """Set up test fixtures"""
-        self.model = LinearRegressionModel()
-        self.X, self.y = create_sample_data()
+    def __init__(self):
+        self.model = LinearRegression()
+        self.is_trained = False
+        self.model_path = "model.pkl"
+    
+    def train(self, X, y):
+        """
+        Train the linear regression model.
         
-        # Create simple test data
-        self.X_train = np.array([[1], [2], [3], [4], [5]])
-        self.y_train = np.array([2, 4, 6, 8, 10])  # y = 2x
+        Args:
+            X: Training features (n_samples, n_features)
+            y: Training target values (n_samples,)
+        """
+        self.model.fit(X, y)
+        self.is_trained = True
+        print(f"Model trained successfully. Coefficient: {self.model.coef_}, Intercept: {self.model.intercept_}")
+    
+    def predict(self, X):
+        """
+        Make predictions using the trained model.
         
-        self.X_test = np.array([[6], [7]])
-        self.y_test = np.array([12, 14])
-    
-    def test_model_initialization(self):
-        """Test that model initializes correctly"""
-        self.assertFalse(self.model.is_trained)
-        self.assertEqual(self.model.model_path, "model.pkl")
-    
-    def test_train_model(self):
-        """Test training functionality"""
-        self.model.train(self.X_train, self.y_train)
-        self.assertTrue(self.model.is_trained)
-        
-        # Check coefficients are close to expected (2x relationship)
-        self.assertAlmostEqual(self.model.model.coef_[0], 2.0, places=5)
-    
-    def test_predict_before_training(self):
-        """Test that predict raises error before training"""
-        with self.assertRaises(ValueError):
-            self.model.predict(self.X_test)
-    
-    def test_predict_after_training(self):
-        """Test prediction after training"""
-        self.model.train(self.X_train, self.y_train)
-        predictions = self.model.predict(self.X_test)
-        
-        self.assertEqual(len(predictions), len(self.X_test))
-        # Check predictions are close to expected
-        np.testing.assert_array_almost_equal(predictions, self.y_test, decimal=0)
-    
-    def test_evaluate_before_training(self):
-        """Test that evaluate raises error before training"""
-        with self.assertRaises(ValueError):
-            self.model.evaluate(self.X_test, self.y_test)
-    
-    def test_evaluate_after_training(self):
-        """Test evaluation after training"""
-        self.model.train(self.X_train, self.y_train)
-        score = self.model.evaluate(self.X_test, self.y_test)
-        
-        # Score should be high for this simple linear relationship
-        self.assertGreater(score, 0.9)
-        self.assertLessEqual(score, 1.0)
-    
-    def test_save_and_load(self):
-        """Test model saving and loading"""
-        self.model.train(self.X_train, self.y_train)
-        
-        # Use temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pkl') as tmp:
-            tmp_path = tmp.name
-        
-        try:
-            # Save model
-            self.model.save(tmp_path)
-            self.assertTrue(os.path.exists(tmp_path))
+        Args:
+            X: Features for prediction (n_samples, n_features)
             
-            # Create new model and load
-            new_model = LinearRegressionModel()
-            new_model.load(tmp_path)
+        Returns:
+            Predictions (n_samples,)
+        """
+        if not self.is_trained:
+            raise ValueError("Model must be trained before making predictions")
+        return self.model.predict(X)
+    
+    def evaluate(self, X, y):
+        """
+        Evaluate model performance using R² score.
+        
+        Args:
+            X: Test features
+            y: Test target values
             
-            # Verify loaded model produces same predictions
-            predictions_original = self.model.predict(self.X_test)
-            predictions_loaded = new_model.predict(self.X_test)
-            
-            np.testing.assert_array_almost_equal(predictions_original, predictions_loaded)
-        finally:
-            # Clean up
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        Returns:
+            R² score
+        """
+        if not self.is_trained:
+            raise ValueError("Model must be trained before evaluation")
+        return self.model.score(X, y)
     
-    def test_load_nonexistent_file(self):
-        """Test that loading nonexistent file raises error"""
-        with self.assertRaises(FileNotFoundError):
-            self.model.load("nonexistent_file.pkl")
+    def save(self, path=None):
+        """Save model to disk"""
+        save_path = path or self.model_path
+        with open(save_path, 'wb') as f:
+            pickle.dump(self.model, f)
+        print(f"Model saved to {save_path}")
     
-    def test_model_coefficients(self):
-        """Test model coefficients after training"""
-        self.model.train(self.X_train, self.y_train)
-        
-        # Coefficients should be accessible
-        self.assertIsNotNone(self.model.model.coef_)
-        self.assertIsNotNone(self.model.model.intercept_)
-    
-    def test_prediction_shape(self):
-        """Test that prediction shape matches input"""
-        self.model.train(self.X, self.y)
-        
-        # Test single prediction
-        single = self.model.predict(self.X[:1])
-        self.assertEqual(single.shape, (1,))
-        
-        # Test multiple predictions
-        multiple = self.model.predict(self.X[:10])
-        self.assertEqual(multiple.shape, (10,))
-    
-    def test_training_with_sample_data(self):
-        """Test training with generated sample data"""
-        split_idx = int(len(self.X) * 0.8)
-        X_train, X_test = self.X[:split_idx], self.X[split_idx:]
-        y_train, y_test = self.y[:split_idx], self.y[split_idx:]
-        
-        self.model.train(X_train, y_train)
-        score = self.model.evaluate(X_test, y_test)
-        
-        # Should have reasonable score
-        self.assertGreater(score, 0.0)
-        self.assertLessEqual(score, 1.0)
+    def load(self, path=None):
+        """Load model from disk"""
+        load_path = path or self.model_path
+        if os.path.exists(load_path):
+            with open(load_path, 'rb') as f:
+                self.model = pickle.load(f)
+            self.is_trained = True
+            print(f"Model loaded from {load_path}")
+        else:
+            raise FileNotFoundError(f"Model file not found at {load_path}")
 
 
-if __name__ == '__main__':
-    unittest.main()
+def create_sample_data():
+    """Generate sample training data"""
+    X, y = make_regression(n_samples=100, n_features=1, noise=10, random_state=42)
+    return X, y
+
+
+def main():
+    """Main function to demonstrate the model"""
+    print("=" * 50)
+    print("Linear Regression Model Training")
+    print("=" * 50)
+    
+    # Create and train model
+    model = LinearRegressionModel()
+    X, y = create_sample_data()
+    
+    # Split data (simple 80-20 split)
+    split_idx = int(len(X) * 0.8)
+    X_train, X_test = X[:split_idx], X[split_idx:]
+    y_train, y_test = y[:split_idx], y[split_idx:]
+    
+    # Train model
+    model.train(X_train, y_train)
+    
+    # Evaluate
+    score = model.evaluate(X_test, y_test)
+    print(f"R² Score: {score:.4f}")
+    
+    # Make predictions
+    predictions = model.predict(X_test[:5])
+    print(f"\nSample predictions: {predictions}")
+    print(f"Actual values: {y_test[:5]}")
+    
+    # Save model
+    model.save()
+    print("\nModel training complete!")
+
+
+if __name__ == "__main__":
+    main()
