@@ -115,7 +115,7 @@ def main():
     # Save model
     model.save()
     print("\nModel training complete!")
-
+    print("Kmec is Deploying a project")
 
 if __name__ == "__main__":
     main()
